@@ -135,51 +135,49 @@ fn ambiguous_link_names<D: Semantics>(doc: &D, out: &mut Vec<Finding>) {
     }
 }
 
+/// Die Deklarationen. Siehe [`crate::structure::METAS`] zur Begründung der
+/// Trennung von den Funktionen.
+pub const METAS: &[Meta] = &[
+    Meta {
+        ids: &["links/name-missing"],
+        tier: Tier::Semantics,
+        wcag: &["2.4.4", "4.1.2"],
+        severity: Severity::Critical,
+        help: "Jeder Link braucht einen Namen, der sein Ziel beschreibt.",
+    },
+    Meta {
+        ids: &["buttons/name-missing"],
+        tier: Tier::Semantics,
+        wcag: &["4.1.2"],
+        severity: Severity::Critical,
+        help: "Jeder Button braucht einen Namen, der seine Wirkung beschreibt.",
+    },
+    Meta {
+        ids: &["svg/name-missing"],
+        tier: Tier::Semantics,
+        wcag: &["1.1.1"],
+        severity: Severity::High,
+        help: "Informative SVGs brauchen einen Namen, dekorative role=\"presentation\".",
+    },
+    Meta {
+        ids: &["links/ambiguous-name"],
+        tier: Tier::Semantics,
+        wcag: &["2.4.4"],
+        severity: Severity::Medium,
+        help: "Gleich benannte Links sollten auf dasselbe Ziel zeigen.",
+    },
+];
+
+/// Die Auswertungsfunktionen, in derselben Reihenfolge wie [`METAS`].
+fn funktionen<D: Semantics>() -> [fn(&D, &mut Vec<Finding>); 4] {
+    [link_names, button_names, svg_names, ambiguous_link_names]
+}
+
 /// Alle Tier-2-Regeln.
 pub fn rules<D: Semantics>() -> Vec<SemanticsRule<D>> {
-    macro_rules! rule {
-        ($id:literal, $wcag:expr, $sev:expr, $help:literal, $f:path) => {
-            SemanticsRule {
-                meta: Meta {
-                    id: $id,
-                    tier: Tier::Semantics,
-                    wcag: $wcag,
-                    severity: $sev,
-                    help: $help,
-                },
-                run: $f,
-            }
-        };
-    }
-
-    vec![
-        rule!(
-            "links/name",
-            &["2.4.4", "4.1.2"],
-            Severity::Critical,
-            "Jeder Link braucht einen Namen, der sein Ziel beschreibt.",
-            link_names
-        ),
-        rule!(
-            "buttons/name",
-            &["4.1.2"],
-            Severity::Critical,
-            "Jeder Button braucht einen Namen, der seine Wirkung beschreibt.",
-            button_names
-        ),
-        rule!(
-            "svg/name",
-            &["1.1.1"],
-            Severity::High,
-            "Informative SVGs brauchen einen Namen, dekorative role=\"presentation\".",
-            svg_names
-        ),
-        rule!(
-            "links/ambiguous-name",
-            &["2.4.4"],
-            Severity::Medium,
-            "Gleich benannte Links sollten auf dasselbe Ziel zeigen.",
-            ambiguous_link_names
-        ),
-    ]
+    METAS
+        .iter()
+        .zip(funktionen::<D>())
+        .map(|(meta, run)| SemanticsRule { meta: *meta, run })
+        .collect()
 }

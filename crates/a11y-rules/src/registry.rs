@@ -11,10 +11,18 @@ use a11y_dom::{Document, Semantics, Tier};
 use a11y_report::{Finding, Severity};
 
 /// Was über eine Regel unabhängig vom Host feststeht.
+///
+/// `ids` listet **alle** Befund-Kennungen, die diese Regel erzeugen kann.
+/// Das ist kein Beiwerk: [`RuleRun`] wird je Kennung geführt, damit
+/// `rule_runs` und `findings` dieselbe Namensmenge benutzen und sich
+/// verbinden lassen. Eine Regel, die `images/alt` hieße, aber
+/// `images/alt-missing` meldete, wäre für einen Auswerter nicht zuordenbar.
+///
+/// [`RuleRun`]: a11y_report::RuleRun
 #[derive(Debug, Clone, Copy)]
 pub struct Meta {
-    /// Stabile Kennung, über alle drei Oberflächen identisch.
-    pub id: &'static str,
+    /// Alle Befund-Kennungen dieser Regel, stabil über alle Oberflächen.
+    pub ids: &'static [&'static str],
     /// Welche Datenschicht die Regel braucht.
     pub tier: Tier,
     /// WCAG-Erfolgskriterien, z. B. `["1.1.1"]`.

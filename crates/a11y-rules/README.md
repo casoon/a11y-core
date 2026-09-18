@@ -34,15 +34,31 @@ Mit einem Host, der `Semantics` erfüllt, laufen die über `run_with_semantics`
 mit. Die Trennung ist keine Formalie: Regeln, die einen echten Accessible Name
 brauchen — Links, Buttons, SVG —, dürfen ohne ihn nicht raten.
 
+## Eine Namensmenge für Befunde und Vermerke
+
+`Meta::ids` deklariert **alle** Befund-Kennungen, die eine Regel erzeugen kann,
+und `RuleRun` wird je Kennung geführt. Damit benutzen `rule_runs` und `findings`
+dieselbe Namensmenge und lassen sich über `rule_id` verbinden.
+
+In 0.1.0 war das getrennt: Vermerke trugen eine übergeordnete Regelkennung
+(`images/alt`), Befunde die spezifische (`images/alt-missing`). Ein Join lieferte
+stillschweigend nichts. Zwei Tests sichern die Zusicherung jetzt ab — jede
+erzeugte Kennung muss deklariert sein, und jeder Befund muss einen passenden
+Vermerk haben.
+
 ## Regeln
 
-**Tier 1** (Struktur): `document/lang`, `document/title`, `zoom/viewport`,
-`headings`, `images/alt`, `forms/label`, `aria/role`, `aria/reference`,
-`ids/duplicate`, `keyboard/positive-tabindex`, `keyboard/hidden-focusable`,
-`lists/structure`, `tables/header`.
+**Tier 1** (Struktur), 20 Kennungen: `document/lang-missing`,
+`document/lang-invalid`, `document/title-missing`, `document/title-empty`,
+`zoom/viewport-locked`, `headings/empty`, `headings/skip-level`,
+`headings/h1-missing`, `images/alt-missing`, `images/alt-suspicious`,
+`forms/label-missing`, `forms/placeholder-as-label`, `aria/role-invalid`,
+`aria/role-abstract`, `aria/reference-missing`, `ids/duplicate`,
+`keyboard/positive-tabindex`, `keyboard/hidden-focusable`,
+`lists/invalid-structure`, `tables/header-missing`.
 
-**Tier 2** (Semantik): `links/name`, `buttons/name`, `svg/name`,
-`links/ambiguous-name`.
+**Tier 2** (Semantik), 4 Kennungen: `links/name-missing`,
+`buttons/name-missing`, `svg/name-missing`, `links/ambiguous-name`.
 
 ## Lizenz
 

@@ -57,22 +57,34 @@ pub fn semantics_rules<D: Semantics>() -> Vec<SemanticsRule<D>> {
     semantics::rules()
 }
 
-/// Nur die Kennungen der Tier-2-Regeln — für Hosts, die sie nicht ausführen
-/// können, aber trotzdem benennen müssen.
-fn semantics_rule_ids() -> &'static [&'static str] {
-    &[
-        "links/name",
-        "buttons/name",
-        "svg/name",
-        "links/ambiguous-name",
-    ]
+/// Die Deklarationen ohne Bindung an einen Host — für Werkzeuge, die den
+/// Regelbestand auflisten oder Kennungen benennen müssen, ohne ihn auszuführen.
+pub fn structure_metas() -> &'static [Meta] {
+    structure::METAS
+}
+
+/// Siehe [`structure_metas`].
+pub fn semantics_metas() -> &'static [Meta] {
+    semantics::METAS
+}
+
+/// Vermerkt je deklarierter Kennung, wie viele Befunde darauf entfallen.
+///
+/// Der Vermerk läuft über die **Befund**-Kennungen, nicht über eine
+/// übergeordnete Regelkennung. Nur so benutzen `rule_runs` und `findings`
+/// dieselbe Namensmenge und lassen sich verbinden.
+fn vermerke(meta: &Meta, gefunden: &[Finding], report: &mut Report) {
+    for id in meta.ids {
+        let anzahl = gefunden.iter().filter(|f| f.rule_id == *id).count();
+        report.record(RuleRun::ran(*id, anzahl));
+    }
 }
 
 fn run_structure<D: Document>(doc: &D, report: &mut Report) {
     for rule in structure_rules::<D>() {
         let mut out: Vec<Finding> = Vec::new();
         (rule.run)(doc, &mut out);
-        report.record(RuleRun::ran(rule.meta.id, out.len()));
+        vermerke(&rule.meta, &out, report);
         report.extend(out);
     }
 }
@@ -84,11 +96,13 @@ fn run_structure<D: Document>(doc: &D, report: &mut Report) {
 pub fn run<D: Document>(doc: &D) -> Report {
     let mut report = Report::new();
     run_structure(doc, &mut report);
-    for id in semantics_rule_ids() {
-        report.record(
-            RuleRun::not_run(*id, NotRun::CapabilityMissing)
-                .with_reason("Host liefert keine Rolle und keinen Accessible Name"),
-        );
+    for meta in semantics_metas() {
+        for id in meta.ids {
+            report.record(
+                RuleRun::not_run(*id, NotRun::CapabilityMissing)
+                    .with_reason("Host liefert keine Rolle und keinen Accessible Name"),
+            );
+        }
     }
     report.finish()
 }
@@ -100,7 +114,7 @@ pub fn run_with_semantics<D: Semantics>(doc: &D) -> Report {
     for rule in semantics_rules::<D>() {
         let mut out: Vec<Finding> = Vec::new();
         (rule.run)(doc, &mut out);
-        report.record(RuleRun::ran(rule.meta.id, out.len()));
+        vermerke(&rule.meta, &out, &mut report);
         report.extend(out);
     }
     report.finish()

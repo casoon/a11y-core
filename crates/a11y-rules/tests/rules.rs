@@ -48,6 +48,67 @@ impl Semantics for MitSemantik<'_> {
     }
 }
 
+/// Ein Dokument, das möglichst viele Regeln auslöst — Grundlage der
+/// Zusicherungen über die Namensmenge.
+fn fehlerhaft() -> Arena {
+    Arena::builder()
+        .open("html")
+        .open("head")
+        .open("title")
+        .close()
+        .open("meta")
+        .attr("name", "viewport")
+        .attr("content", "user-scalable=no")
+        .close()
+        .close()
+        .open("body")
+        .open("h2")
+        .text("Springt")
+        .close()
+        .open("h4")
+        .close()
+        .open("img")
+        .attr("src", "a.png")
+        .close()
+        .open("img")
+        .attr("src", "b.png")
+        .attr("alt", "b.png")
+        .close()
+        .open("a")
+        .attr("href", "/x")
+        .close()
+        .open("button")
+        .close()
+        .open("svg")
+        .close()
+        .open("input")
+        .attr("id", "d")
+        .close()
+        .open("div")
+        .attr("id", "d")
+        .attr("role", "buton")
+        .close()
+        .open("div")
+        .attr("role", "widget")
+        .attr("aria-labelledby", "fehlt")
+        .attr("tabindex", "4")
+        .close()
+        .open("ul")
+        .open("div")
+        .close()
+        .close()
+        .open("table")
+        .open("tr")
+        .open("td")
+        .text("x")
+        .close()
+        .close()
+        .close()
+        .close()
+        .close()
+        .build()
+}
+
 fn ids(r: &Report) -> Vec<&str> {
     r.findings.iter().map(|f| f.rule_id.as_str()).collect()
 }
@@ -497,10 +558,13 @@ fn ohne_semantik_werden_tier2_regeln_als_nicht_gelaufen_vermerkt() {
         "ohne Accessible Name darf die Regel nicht raten"
     );
 
+    // Der Vermerk laeuft ueber die Befund-Kennung, nicht ueber eine
+    // uebergeordnete Regelkennung -- nur so passen rule_runs und findings
+    // zusammen.
     let vermerk = r
         .rule_runs
         .iter()
-        .find(|x| x.rule_id == "links/name")
+        .find(|x| x.rule_id == "links/name-missing")
         .unwrap();
     assert!(!vermerk.did_run());
     assert_eq!(
@@ -604,7 +668,7 @@ fn aria_hidden_elemente_bleiben_bei_tier2_aussen_vor() {
 }
 
 #[test]
-fn jede_regel_hinterlaesst_genau_einen_ausfuehrungsvermerk() {
+fn jede_kennung_hinterlaesst_genau_einen_ausfuehrungsvermerk() {
     let doc = sauber().open("body").close().close().build();
     let r = run(&doc);
     let mut kennungen: Vec<&str> = r.rule_runs.iter().map(|x| x.rule_id.as_str()).collect();
@@ -612,7 +676,12 @@ fn jede_regel_hinterlaesst_genau_einen_ausfuehrungsvermerk() {
     kennungen.sort_unstable();
     kennungen.dedup();
     assert_eq!(kennungen.len(), anzahl, "doppelte Vermerke");
-    assert_eq!(anzahl, 13 + 4, "13 Tier-1- plus 4 Tier-2-Regeln");
+    let deklariert: usize = a11y_rules::structure_metas()
+        .iter()
+        .chain(a11y_rules::semantics_metas())
+        .map(|m| m.ids.len())
+        .sum();
+    assert_eq!(anzahl, deklariert, "ein Vermerk je deklarierter Kennung");
 }
 
 #[test]
@@ -639,4 +708,68 @@ fn befunde_tragen_wcag_kriterien_und_eine_verortung() {
     let knoten = doc.get(a11y_dom::NodeId(id)).unwrap();
     assert_eq!(knoten.local_name(), "img");
     let _ = elements(&doc).count();
+}
+
+// --- Die Zusicherung, die den Bericht auswertbar macht --------------------
+
+/// `rule_runs` und `findings` müssen dieselbe Namensmenge benutzen. Sonst
+/// liefert ein Join über `rule_id` stillschweigend nichts — genau der Fehler,
+/// der hier einmal drinsteckte: Vermerke trugen `images/alt`, Befunde
+/// `images/alt-missing`.
+#[test]
+fn jeder_befund_hat_einen_passenden_ausfuehrungsvermerk() {
+    let arena = fehlerhaft();
+    let doc = MitSemantik::new(&arena);
+    let r = run_with_semantics(&doc);
+
+    let vermerkt: std::collections::HashSet<&str> =
+        r.rule_runs.iter().map(|x| x.rule_id.as_str()).collect();
+
+    for f in &r.findings {
+        assert!(
+            vermerkt.contains(f.rule_id.as_str()),
+            "Befund {:?} hat keinen Ausfuehrungsvermerk — rule_runs und findings \
+             benutzen verschiedene Namensmengen",
+            f.rule_id
+        );
+    }
+    assert!(!r.findings.is_empty(), "Testdokument muss Befunde erzeugen");
+}
+
+/// Jede erzeugte Kennung muss in `Meta::ids` deklariert sein. Fehlt eine, ist
+/// sie im Bericht als „nie gelaufen" unsichtbar.
+#[test]
+fn jede_erzeugte_kennung_ist_deklariert() {
+    let arena = fehlerhaft();
+    let doc = MitSemantik::new(&arena);
+    let r = run_with_semantics(&doc);
+
+    let deklariert: std::collections::HashSet<&str> = a11y_rules::structure_metas()
+        .iter()
+        .chain(a11y_rules::semantics_metas())
+        .flat_map(|m| m.ids.iter().copied())
+        .collect();
+
+    for f in &r.findings {
+        assert!(
+            deklariert.contains(f.rule_id.as_str()),
+            "Kennung {:?} wird erzeugt, aber in keinem Meta::ids deklariert",
+            f.rule_id
+        );
+    }
+}
+
+/// Keine Kennung darf doppelt deklariert sein — sonst gäbe es zwei Vermerke
+/// für denselben Befundtyp.
+#[test]
+fn keine_kennung_ist_doppelt_deklariert() {
+    let mut alle: Vec<&str> = a11y_rules::structure_metas()
+        .iter()
+        .chain(a11y_rules::semantics_metas())
+        .flat_map(|m| m.ids.iter().copied())
+        .collect();
+    let anzahl = alle.len();
+    alle.sort_unstable();
+    alle.dedup();
+    assert_eq!(alle.len(), anzahl, "doppelt deklarierte Kennung");
 }

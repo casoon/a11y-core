@@ -559,114 +559,131 @@ fn table_headers<D: Document>(doc: &D, out: &mut Vec<Finding>) {
     }
 }
 
+/// Die Deklarationen. Getrennt von der Zuordnung zu Funktionen, damit sie auch
+/// ohne konkreten Host lesbar sind — ein Host, der diesen Tier nicht bedient,
+/// muss die Kennungen trotzdem benennen können.
+pub const METAS: &[Meta] = &[
+    Meta {
+        ids: &["document/lang-missing", "document/lang-invalid"],
+        tier: Tier::Structure,
+        wcag: &["3.1.1"],
+        severity: Severity::High,
+        help: "Das <html>-Element braucht ein gültiges lang-Attribut.",
+    },
+    Meta {
+        ids: &["document/title-missing", "document/title-empty"],
+        tier: Tier::Structure,
+        wcag: &["2.4.2"],
+        severity: Severity::High,
+        help: "Jede Seite braucht einen aussagekräftigen <title>.",
+    },
+    Meta {
+        ids: &["zoom/viewport-locked"],
+        tier: Tier::Structure,
+        wcag: &["1.4.4"],
+        severity: Severity::High,
+        help: "Der Viewport darf Zoomen nicht verhindern.",
+    },
+    Meta {
+        ids: &[
+            "headings/empty",
+            "headings/skip-level",
+            "headings/h1-missing",
+        ],
+        tier: Tier::Structure,
+        wcag: &["1.3.1", "2.4.6"],
+        severity: Severity::Medium,
+        help: "Überschriften bilden die Gliederung; Ebenen nicht überspringen.",
+    },
+    Meta {
+        ids: &["images/alt-missing", "images/alt-suspicious"],
+        tier: Tier::Structure,
+        wcag: &["1.1.1"],
+        severity: Severity::High,
+        help: "Informative Bilder brauchen einen beschreibenden Alt-Text.",
+    },
+    Meta {
+        ids: &["forms/label-missing", "forms/placeholder-as-label"],
+        tier: Tier::Structure,
+        wcag: &["1.3.1", "3.3.2", "4.1.2"],
+        severity: Severity::Critical,
+        help: "Jedes Eingabefeld braucht ein zugeordnetes Label.",
+    },
+    Meta {
+        ids: &["aria/role-invalid", "aria/role-abstract"],
+        tier: Tier::Structure,
+        wcag: &["4.1.2"],
+        severity: Severity::High,
+        help: "Nur Rollen aus der ARIA-Spezifikation verwenden.",
+    },
+    Meta {
+        ids: &["aria/reference-missing"],
+        tier: Tier::Structure,
+        wcag: &["1.3.1", "4.1.2"],
+        severity: Severity::High,
+        help: "ARIA-Verweise müssen auf vorhandene IDs zeigen.",
+    },
+    Meta {
+        ids: &["ids/duplicate"],
+        tier: Tier::Structure,
+        wcag: &["4.1.1"],
+        severity: Severity::Medium,
+        help: "IDs müssen im Dokument eindeutig sein.",
+    },
+    Meta {
+        ids: &["keyboard/positive-tabindex"],
+        tier: Tier::Structure,
+        wcag: &["2.4.3"],
+        severity: Severity::Medium,
+        help: "Positive tabindex-Werte brechen die Tabreihenfolge.",
+    },
+    Meta {
+        ids: &["keyboard/hidden-focusable"],
+        tier: Tier::Structure,
+        wcag: &["1.3.1", "4.1.2"],
+        severity: Severity::High,
+        help: "Fokussierbare Elemente dürfen nicht aria-hidden sein.",
+    },
+    Meta {
+        ids: &["lists/invalid-structure"],
+        tier: Tier::Structure,
+        wcag: &["1.3.1"],
+        severity: Severity::Medium,
+        help: "<ul> und <ol> dürfen als direkte Kinder nur <li> haben.",
+    },
+    Meta {
+        ids: &["tables/header-missing"],
+        tier: Tier::Structure,
+        wcag: &["1.3.1"],
+        severity: Severity::High,
+        help: "Datentabellen brauchen <th>-Kopfzellen.",
+    },
+];
+
+/// Die Auswertungsfunktionen, in derselben Reihenfolge wie [`METAS`].
+fn funktionen<D: Document>() -> [fn(&D, &mut Vec<Finding>); 13] {
+    [
+        lang,
+        title,
+        viewport,
+        headings,
+        images,
+        form_labels,
+        aria_roles,
+        aria_references,
+        duplicate_ids,
+        tabindex,
+        hidden_focusable,
+        list_structure,
+        table_headers,
+    ]
+}
+
 /// Alle Tier-1-Regeln.
 pub fn rules<D: Document>() -> Vec<StructureRule<D>> {
-    macro_rules! rule {
-        ($id:literal, $wcag:expr, $sev:expr, $help:literal, $f:path) => {
-            StructureRule {
-                meta: Meta {
-                    id: $id,
-                    tier: Tier::Structure,
-                    wcag: $wcag,
-                    severity: $sev,
-                    help: $help,
-                },
-                run: $f,
-            }
-        };
-    }
-
-    vec![
-        rule!(
-            "document/lang",
-            &["3.1.1"],
-            Severity::High,
-            "Das <html>-Element braucht ein gültiges lang-Attribut.",
-            lang
-        ),
-        rule!(
-            "document/title",
-            &["2.4.2"],
-            Severity::High,
-            "Jede Seite braucht einen aussagekräftigen <title>.",
-            title
-        ),
-        rule!(
-            "zoom/viewport",
-            &["1.4.4"],
-            Severity::High,
-            "Der Viewport darf Zoomen nicht verhindern.",
-            viewport
-        ),
-        rule!(
-            "headings",
-            &["1.3.1", "2.4.6"],
-            Severity::Medium,
-            "Überschriften bilden die Gliederung; Ebenen nicht überspringen.",
-            headings
-        ),
-        rule!(
-            "images/alt",
-            &["1.1.1"],
-            Severity::High,
-            "Informative Bilder brauchen einen beschreibenden Alt-Text.",
-            images
-        ),
-        rule!(
-            "forms/label",
-            &["1.3.1", "3.3.2", "4.1.2"],
-            Severity::Critical,
-            "Jedes Eingabefeld braucht ein zugeordnetes Label.",
-            form_labels
-        ),
-        rule!(
-            "aria/role",
-            &["4.1.2"],
-            Severity::High,
-            "Nur Rollen aus der ARIA-Spezifikation verwenden.",
-            aria_roles
-        ),
-        rule!(
-            "aria/reference",
-            &["1.3.1", "4.1.2"],
-            Severity::High,
-            "ARIA-Verweise müssen auf vorhandene IDs zeigen.",
-            aria_references
-        ),
-        rule!(
-            "ids/duplicate",
-            &["4.1.1"],
-            Severity::Medium,
-            "IDs müssen im Dokument eindeutig sein.",
-            duplicate_ids
-        ),
-        rule!(
-            "keyboard/positive-tabindex",
-            &["2.4.3"],
-            Severity::Medium,
-            "Positive tabindex-Werte brechen die Tabreihenfolge.",
-            tabindex
-        ),
-        rule!(
-            "keyboard/hidden-focusable",
-            &["1.3.1", "4.1.2"],
-            Severity::High,
-            "Fokussierbare Elemente dürfen nicht aria-hidden sein.",
-            hidden_focusable
-        ),
-        rule!(
-            "lists/structure",
-            &["1.3.1"],
-            Severity::Medium,
-            "<ul> und <ol> dürfen als direkte Kinder nur <li> haben.",
-            list_structure
-        ),
-        rule!(
-            "tables/header",
-            &["1.3.1"],
-            Severity::High,
-            "Datentabellen brauchen <th>-Kopfzellen.",
-            table_headers
-        ),
-    ]
+    METAS
+        .iter()
+        .zip(funktionen::<D>())
+        .map(|(meta, run)| StructureRule { meta: *meta, run })
+        .collect()
 }

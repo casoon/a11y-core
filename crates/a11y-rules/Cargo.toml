@@ -13,3 +13,6 @@ categories.workspace = true
 [dependencies]
 a11y-dom = { workspace = true }
 a11y-report = { workspace = true }
+
+[dev-dependencies]
+accname = { workspace = true }

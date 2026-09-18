@@ -105,18 +105,23 @@ pub enum NameSource {
 /// auditmysite liefert beides nativ aus dem Accessibility-Tree des Browsers,
 /// inklusive [`NameSource`] und `is_ignored`. astro-post-audit und LiveAudit
 /// berechnen es über das `accname`-Crate; dort bleibt `name_source` `None`.
+/// Die Lebenszeit des Knotens ist an die Ausleihe des Dokuments gekoppelt
+/// (`&'n self`, `Self::N<'n>`). Ohne diese Kopplung könnte ein Host, der seinen
+/// Baum nur *ausleiht* und daneben abgeleitete Daten hält — etwa einen
+/// vorberechneten ID-Index —, das Trait gar nicht erfüllen: `Self: 'n` wäre
+/// nicht herleitbar.
 pub trait Semantics: Document {
-    fn role(&self, node: Self::N<'_>) -> Option<String>;
+    fn role<'n>(&'n self, node: Self::N<'n>) -> Option<String>;
 
-    fn accessible_name(&self, node: Self::N<'_>) -> Option<String>;
+    fn accessible_name<'n>(&'n self, node: Self::N<'n>) -> Option<String>;
 
-    fn name_source(&self, _node: Self::N<'_>) -> Option<NameSource> {
+    fn name_source<'n>(&'n self, _node: Self::N<'n>) -> Option<NameSource> {
         None
     }
 
     /// Ob der Accessibility-Tree diesen Knoten auslässt — etwa wegen
     /// `aria-hidden`, `display: none` oder weil er rein präsentational ist.
-    fn is_ignored(&self, _node: Self::N<'_>) -> bool {
+    fn is_ignored<'n>(&'n self, _node: Self::N<'n>) -> bool {
         false
     }
 }
@@ -169,13 +174,13 @@ pub struct ComputedStyle {
 /// Statische HTML-Analyse kann das nicht; Kontrast-, Target-Size- und
 /// Reflow-Regeln melden dort `UNTESTED`.
 pub trait Rendering: Document {
-    fn computed_style(&self, node: Self::N<'_>) -> Option<ComputedStyle>;
+    fn computed_style<'n>(&'n self, node: Self::N<'n>) -> Option<ComputedStyle>;
 
-    fn bounds(&self, node: Self::N<'_>) -> Option<Rect>;
+    fn bounds<'n>(&'n self, node: Self::N<'n>) -> Option<Rect>;
 
     /// Ob der Knoten tatsächlich sichtbar gerendert wird — nicht dasselbe wie
     /// „steht im Markup".
-    fn is_rendered(&self, node: Self::N<'_>) -> bool {
+    fn is_rendered<'n>(&'n self, node: Self::N<'n>) -> bool {
         self.bounds(node).is_some_and(|b| !b.is_empty())
     }
 }
@@ -190,7 +195,7 @@ pub trait Interaction: Document {
     fn tab_order(&self) -> Vec<crate::NodeId>;
 
     /// Ob der Knoten bei Fokus einen sichtbaren Indikator zeigt.
-    fn has_visible_focus(&self, _node: Self::N<'_>) -> Option<bool> {
+    fn has_visible_focus<'n>(&'n self, _node: Self::N<'n>) -> Option<bool> {
         None
     }
 }

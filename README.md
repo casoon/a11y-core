@@ -15,8 +15,8 @@ bedient drei Oberflächen mit identischen Regelkennungen und identischem JSON:
 |---|---|---|
 | [`a11y-report`](crates/a11y-report) | Befund- und Berichtsmodell, JSON-Vertrag | erste Fassung |
 | [`a11y-dom`](crates/a11y-dom) | Dokumentmodell-Abstraktion plus Fähigkeits-Tiers | erste Fassung |
+| [`accname`](crates/accname) | WAI-ARIA Accessible Name und Role Computation | erste Fassung |
 | [`a11y-rules`](crates/a11y-rules) | die Regeln, generisch über das Dokumentmodell | 17 Regeln |
-| `accname` | WAI-ARIA Accessible Name und Role Computation | geplant |
 | `a11y-conformance` | geteiltes Fixture-Korpus gegen Auseinanderlaufen | geplant |
 
 ## Fähigkeiten statt Optionen
@@ -41,6 +41,20 @@ Der Basisbaum ist bewusst **DOM-förmig**, nicht Accessibility-Tree-förmig: Die
 Mehrzahl der Regeln braucht Attribute (`tabindex`, `id`, `role`, `alt`), und der
 native Accessibility-Tree gibt die gar nicht her — `tabindex` taucht dort nicht
 auf. Rolle und Name kommen als eigene Fähigkeit obendrauf.
+
+## `accname` steht für sich
+
+Die Accessible-Name-Berechnung ist als eigenes Crate gebaut, gegen
+[accname 1.2](https://w3c.github.io/accname/) und
+[HTML-AAM](https://www.w3.org/TR/html-aam-1.0/), nicht gegen eine vorhandene
+Implementierung. Auf crates.io gab es bislang keine eigenständige
+Rust-Umsetzung.
+
+Eine Näherung aus „Teilbaumtext plus `aria-label`" reicht dafür nicht:
+`aria-labelledby` löst Verweisketten auf und darf dabei sonst versteckte Knoten
+heranziehen, ein eingebettetes Steuerelement steuert innerhalb einer Rekursion
+seinen *Wert* bei statt seiner Beschriftung, und für Rollen wie `generic` oder
+`paragraph` ist ein Name schlicht verboten.
 
 ## Zwei Achsen, nicht drei
 

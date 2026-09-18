@@ -21,7 +21,7 @@ fn at(id: NodeId) -> Location {
     Location::node(id.to_string())
 }
 
-fn named<D: Semantics>(doc: &D, n: D::N<'_>) -> bool {
+fn named<'n, D: Semantics>(doc: &'n D, n: D::N<'n>) -> bool {
     doc.accessible_name(n).is_some_and(|s| !s.trim().is_empty())
 }
 

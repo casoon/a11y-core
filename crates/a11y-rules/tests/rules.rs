@@ -1,60 +1,49 @@
 //! Regeltests gegen die Referenz-Arena.
 
-use a11y_dom::{elements, subtree_text, Arena, Document, NameSource, Node, Semantics};
+use a11y_dom::{elements, Arena, ArenaNode, Document, Node, Semantics};
 use a11y_report::{Outcome, Report};
 use a11y_rules::{run, run_with_semantics};
+use accname::IdIndex;
 
-/// Ein Tier-2-Host für die Tests.
+/// Ein Tier-2-Host für die Tests: die Arena plus echte Namensberechnung.
 ///
-/// **Kein Ersatz für `accname`.** Diese Näherung — `aria-label`, dann `alt`,
-/// dann Teilbaumtext, dann `title` — reicht für die Testfälle hier, liegt aber
-/// in genau den Fällen falsch, für die es das eigene Crate braucht:
-/// `aria-labelledby`-Ketten, versteckte Teilbäume, eingebettete Bilder. Sobald
-/// `accname` steht, ersetzt es das hier.
-struct MitSemantik(Arena);
+/// Zeigt zugleich, wie ein Host `accname` in `Semantics` einhängt — der Index
+/// wird einmal gebaut und gehalten, nicht je Aufruf.
+struct MitSemantik<'a> {
+    doc: &'a Arena,
+    ids: IdIndex<'a, ArenaNode<'a>>,
+}
 
-impl Document for MitSemantik {
-    type N<'a>
-        = <Arena as Document>::N<'a>
-    where
-        Self: 'a;
-
-    fn root(&self) -> Self::N<'_> {
-        self.0.root()
+impl<'a> MitSemantik<'a> {
+    fn new(doc: &'a Arena) -> Self {
+        MitSemantik {
+            ids: IdIndex::build(doc.root()),
+            doc,
+        }
     }
 }
 
-impl Semantics for MitSemantik {
-    fn role(&self, node: Self::N<'_>) -> Option<String> {
-        node.attr("role")
-            .map(str::to_string)
-            .or_else(|| match node.local_name() {
-                "a" if node.has_attr("href") => Some("link".into()),
-                "button" => Some("button".into()),
-                "img" => Some("img".into()),
-                _ => None,
-            })
+impl Document for MitSemantik<'_> {
+    type N<'n>
+        = ArenaNode<'n>
+    where
+        Self: 'n;
+
+    fn root(&self) -> Self::N<'_> {
+        self.doc.root()
+    }
+}
+
+impl Semantics for MitSemantik<'_> {
+    fn role<'n>(&'n self, node: Self::N<'n>) -> Option<String> {
+        accname::role(node).map(str::to_string)
     }
 
-    fn accessible_name(&self, node: Self::N<'_>) -> Option<String> {
-        let kandidat = node
-            .attr("aria-label")
-            .map(str::to_string)
-            .or_else(|| node.attr("alt").map(str::to_string))
-            .unwrap_or_else(|| subtree_text(node));
-        let kandidat = if kandidat.trim().is_empty() {
-            node.attr("title").unwrap_or("").to_string()
-        } else {
-            kandidat
-        };
-        (!kandidat.trim().is_empty()).then(|| kandidat.trim().to_string())
+    fn accessible_name<'n>(&'n self, node: Self::N<'n>) -> Option<String> {
+        accname::name(node, &self.ids)
     }
 
-    fn name_source(&self, node: Self::N<'_>) -> Option<NameSource> {
-        node.has_attr("aria-label").then_some(NameSource::AriaLabel)
-    }
-
-    fn is_ignored(&self, node: Self::N<'_>) -> bool {
+    fn is_ignored<'n>(&'n self, node: Self::N<'n>) -> bool {
         node.attr("aria-hidden") == Some("true")
     }
 }
@@ -522,22 +511,21 @@ fn ohne_semantik_werden_tier2_regeln_als_nicht_gelaufen_vermerkt() {
 
 #[test]
 fn mit_semantik_laufen_tier2_regeln_mit() {
-    let doc = MitSemantik(
-        sauber()
-            .open("body")
-            .open("a")
-            .attr("href", "/x")
-            .close()
-            .open("a")
-            .attr("href", "/y")
-            .text("Mehr")
-            .close()
-            .open("button")
-            .close()
-            .close()
-            .close()
-            .build(),
-    );
+    let arena = sauber()
+        .open("body")
+        .open("a")
+        .attr("href", "/x")
+        .close()
+        .open("a")
+        .attr("href", "/y")
+        .text("Mehr")
+        .close()
+        .open("button")
+        .close()
+        .close()
+        .close()
+        .build();
+    let doc = MitSemantik::new(&arena);
     let r = run_with_semantics(&doc);
 
     assert_eq!(r.summary.rules_not_run, 0);
@@ -553,25 +541,24 @@ fn mit_semantik_laufen_tier2_regeln_mit() {
 
 #[test]
 fn gleicher_linktext_verschiedene_ziele() {
-    let doc = MitSemantik(
-        sauber()
-            .open("body")
-            .open("a")
-            .attr("href", "/a")
-            .text("Mehr")
-            .close()
-            .open("a")
-            .attr("href", "/b")
-            .text("Mehr")
-            .close()
-            .open("a")
-            .attr("href", "/c")
-            .text("Zum Bericht")
-            .close()
-            .close()
-            .close()
-            .build(),
-    );
+    let arena = sauber()
+        .open("body")
+        .open("a")
+        .attr("href", "/a")
+        .text("Mehr")
+        .close()
+        .open("a")
+        .attr("href", "/b")
+        .text("Mehr")
+        .close()
+        .open("a")
+        .attr("href", "/c")
+        .text("Zum Bericht")
+        .close()
+        .close()
+        .close()
+        .build();
+    let doc = MitSemantik::new(&arena);
     let r = run_with_semantics(&doc);
     let treffer: Vec<_> = r
         .findings
@@ -584,37 +571,35 @@ fn gleicher_linktext_verschiedene_ziele() {
 
 #[test]
 fn gleicher_linktext_gleiches_ziel_ist_in_ordnung() {
-    let doc = MitSemantik(
-        sauber()
-            .open("body")
-            .open("a")
-            .attr("href", "/a")
-            .text("Mehr")
-            .close()
-            .open("a")
-            .attr("href", "/a")
-            .text("Mehr")
-            .close()
-            .close()
-            .close()
-            .build(),
-    );
+    let arena = sauber()
+        .open("body")
+        .open("a")
+        .attr("href", "/a")
+        .text("Mehr")
+        .close()
+        .open("a")
+        .attr("href", "/a")
+        .text("Mehr")
+        .close()
+        .close()
+        .close()
+        .build();
+    let doc = MitSemantik::new(&arena);
     assert!(!hat(&run_with_semantics(&doc), "links/ambiguous-name"));
 }
 
 #[test]
 fn aria_hidden_elemente_bleiben_bei_tier2_aussen_vor() {
-    let doc = MitSemantik(
-        sauber()
-            .open("body")
-            .open("a")
-            .attr("href", "/x")
-            .attr("aria-hidden", "true")
-            .close()
-            .close()
-            .close()
-            .build(),
-    );
+    let arena = sauber()
+        .open("body")
+        .open("a")
+        .attr("href", "/x")
+        .attr("aria-hidden", "true")
+        .close()
+        .close()
+        .close()
+        .build();
+    let doc = MitSemantik::new(&arena);
     assert!(!hat(&run_with_semantics(&doc), "links/name-missing"));
 }
 

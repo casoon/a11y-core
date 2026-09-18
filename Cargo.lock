@@ -3,11 +3,23 @@
 version = 4
 
 [[package]]
+name = "a11y-dom"
+version = "0.1.0"
+
+[[package]]
 name = "a11y-report"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "a11y-rules"
+version = "0.1.0"
+dependencies = [
+ "a11y-dom",
+ "a11y-report",
 ]
 
 [[package]]

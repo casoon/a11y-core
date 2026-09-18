@@ -14,10 +14,33 @@ bedient drei Oberflächen mit identischen Regelkennungen und identischem JSON:
 | Crate | Zweck | Stand |
 |---|---|---|
 | [`a11y-report`](crates/a11y-report) | Befund- und Berichtsmodell, JSON-Vertrag | erste Fassung |
-| `a11y-dom` | Dokumentmodell-Abstraktion, generisch über den Baum des Hosts | geplant |
+| [`a11y-dom`](crates/a11y-dom) | Dokumentmodell-Abstraktion plus Fähigkeits-Tiers | erste Fassung |
+| [`a11y-rules`](crates/a11y-rules) | die Regeln, generisch über das Dokumentmodell | 17 Regeln |
 | `accname` | WAI-ARIA Accessible Name und Role Computation | geplant |
-| `a11y-rules` | die Regeln selbst, generisch über Fähigkeits-Tiers | geplant |
 | `a11y-conformance` | geteiltes Fixture-Korpus gegen Auseinanderlaufen | geplant |
+
+## Fähigkeiten statt Optionen
+
+Die drei Oberflächen unterscheiden sich nicht darin, wie sie dieselben Daten
+darstellen, sondern darin, **welche Daten es überhaupt gibt**. Ein flaches Trait
+mit `Option`-Rückgaben würde dazu führen, dass Regeln je nach Host
+stillschweigend nicht laufen.
+
+| | statisches HTML | Chrome via CDP | In-Page WASM |
+|---|---|---|---|
+| Struktur — Tags, Attribute, Text, Hierarchie | ✓ | ✓ | ✓ |
+| Semantik — Rolle, Accessible Name | berechnet | nativ | berechnet |
+| Rendering — Stile, Geometrie | — | ✓ | ✓ |
+| Interaktion — Fokus, Ereignisse | — | ✓ | ✓ |
+
+Jede Regel deklariert ihren Tier, jeder Host implementiert die Traits, die er
+bedienen kann — und eine Regel, deren Tier nicht erfüllt ist, wird als
+`UNTESTED` vermerkt statt zu schweigen.
+
+Der Basisbaum ist bewusst **DOM-förmig**, nicht Accessibility-Tree-förmig: Die
+Mehrzahl der Regeln braucht Attribute (`tabindex`, `id`, `role`, `alt`), und der
+native Accessibility-Tree gibt die gar nicht her — `tabindex` taucht dort nicht
+auf. Rolle und Name kommen als eigene Fähigkeit obendrauf.
 
 ## Zwei Achsen, nicht drei
 

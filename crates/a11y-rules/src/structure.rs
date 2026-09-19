@@ -476,7 +476,10 @@ fn tabindex<D: Document>(doc: &D, out: &mut Vec<Finding>) {
                     "keyboard/positive-tabindex",
                     format!("tabindex=\"{value}\" bricht die natürliche Tabreihenfolge."),
                 )
-                .with_severity(Severity::Medium)
+                // Hoch, nicht mittel: Ein positiver tabindex bricht die
+                // Tabreihenfolge reproduzierbar und für jeden, der mit der
+                // Tastatur navigiert — das ist kein Schönheitsfehler.
+                .with_severity(Severity::High)
                 .with_wcag(["2.4.3"])
                 .at(at(n.id())),
             );
@@ -679,7 +682,7 @@ pub const METAS: &[Meta] = &[
         ids: &["keyboard/positive-tabindex"],
         tier: Tier::Structure,
         wcag: &["2.4.3"],
-        severity: Severity::Medium,
+        severity: Severity::High,
         help: "Positive tabindex-Werte brechen die Tabreihenfolge.",
     },
     Meta {

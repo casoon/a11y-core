@@ -917,3 +917,34 @@ fn rollentabelle_ohne_kopf_faellt_auf() {
         .build();
     assert!(hat(&run(&doc), "tables/header-missing"));
 }
+
+/// Die Einstufungen, bei denen eine stille Absenkung fachlich etwas kaputt
+/// machen würde. Nicht der ganze Katalog — nur die Fälle, über die schon
+/// einmal entschieden wurde.
+#[test]
+fn einstufungen_bleiben_wo_sie_begruendet_wurden() {
+    use a11y_report::Severity;
+
+    let metas: Vec<_> = a11y_rules::structure_metas()
+        .iter()
+        .chain(a11y_rules::semantics_metas())
+        .collect();
+    let sev = |id: &str| {
+        metas
+            .iter()
+            .find(|m| m.ids.contains(&id))
+            .unwrap_or_else(|| panic!("Kennung {id} nicht deklariert"))
+            .severity
+    };
+
+    // Bricht die Tabreihenfolge reproduzierbar und fuer jeden, der mit der
+    // Tastatur navigiert.
+    assert_eq!(sev("keyboard/positive-tabindex"), Severity::High);
+
+    // WCAG 4.1.1 wurde in WCAG 2.2 entfernt; der echte Schaden entsteht erst
+    // bei einer Referenz, und dafuer gibt es aria/reference-missing.
+    assert_eq!(sev("ids/duplicate"), Severity::Medium);
+
+    // Ein Feld ohne Label ist fuer Screenreader-Nutzer unbenutzbar.
+    assert_eq!(sev("forms/label-missing"), Severity::Critical);
+}

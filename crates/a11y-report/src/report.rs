@@ -29,6 +29,18 @@ pub enum NotRun {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuleRun {
     pub rule_id: String,
+    /// Der Durchgang, in dem diese Regel lief — etwa `desktop` oder `mobile`.
+    ///
+    /// Werkzeuge, die dieselbe Seite mehrfach unter verschiedenen Bedingungen
+    /// prüfen, führen je Durchgang einen eigenen Vermerk. Der Schlüssel eines
+    /// Vermerks ist dann `(rule_id, viewport)`, nicht `rule_id` allein.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewport: Option<String>,
+    /// Die Erfolgskriterien, die mit dieser Regel stehen und fallen. Nötig,
+    /// damit ein Bericht auch für eine **nicht** gelaufene Regel sagen kann,
+    /// welches Kriterium ungeprüft blieb.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wcag: Vec<String>,
     /// `None` = gelaufen. `Some(_)` = nicht gelaufen, mit Grund.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub not_run: Option<NotRun>,
@@ -44,6 +56,8 @@ impl RuleRun {
     pub fn ran(rule_id: impl Into<String>, findings: usize) -> Self {
         RuleRun {
             rule_id: rule_id.into(),
+            viewport: None,
+            wcag: Vec::new(),
             not_run: None,
             findings,
             reason: None,
@@ -53,10 +67,23 @@ impl RuleRun {
     pub fn not_run(rule_id: impl Into<String>, why: NotRun) -> Self {
         RuleRun {
             rule_id: rule_id.into(),
+            viewport: None,
+            wcag: Vec::new(),
             not_run: Some(why),
             findings: 0,
             reason: None,
         }
+    }
+
+    /// Hält fest, in welchem Durchgang die Regel lief.
+    pub fn in_viewport(mut self, v: impl Into<String>) -> Self {
+        self.viewport = Some(v.into());
+        self
+    }
+
+    pub fn with_wcag(mut self, criteria: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.wcag = criteria.into_iter().map(Into::into).collect();
+        self
     }
 
     pub fn with_reason(mut self, r: impl Into<String>) -> Self {

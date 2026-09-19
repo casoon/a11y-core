@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::extra::Extra;
 use crate::outcome::{Outcome, Severity, WcagLevel};
 
 /// Wo ein Befund sitzt. Die drei Oberflächen verorten unterschiedlich:
@@ -116,6 +117,10 @@ pub struct Finding {
     /// Stabile Regelkennung, z. B. `a11y/img-alt`. Über alle Oberflächen
     /// identisch — das ist der Sinn des gemeinsamen Modells.
     pub rule_id: String,
+    /// Menschenlesbarer Name der Regel, für Berichte, die mehr als die Kennung
+    /// zeigen wollen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_name: Option<String>,
     pub outcome: Outcome,
     pub severity: Severity,
     /// Was ist der Fall. Sachlich, ohne Handlungsanweisung.
@@ -123,6 +128,17 @@ pub struct Finding {
 
     #[serde(default, skip_serializing_if = "Location::is_empty")]
     pub location: Location,
+
+    /// Die berechnete Rolle des betroffenen Elements.
+    ///
+    /// Gehört zum Befund, nicht zur Verortung: Wer einen Bericht liest, will
+    /// wissen, *was* das Element für die Assistenztechnik war — ein Selektor
+    /// allein sagt das nicht. Leer, wenn der Host keine Semantik liefert.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    /// Der Accessible Name des betroffenen Elements, soweit vorhanden.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 
     /// Erfüllte bzw. verletzte WCAG-Erfolgskriterien, z. B. `["1.1.1"]`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -150,16 +166,24 @@ pub struct Finding {
     pub snippet: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<Evidence>,
+
+    /// Werkzeugspezifische Beigabe. Nie serialisiert, nicht Teil der Identität
+    /// dieses Befunds — siehe [`Extra`].
+    #[serde(skip)]
+    pub extra: Extra,
 }
 
 impl Finding {
     fn new(outcome: Outcome, rule_id: impl Into<String>, message: impl Into<String>) -> Self {
         Finding {
             rule_id: rule_id.into(),
+            rule_name: None,
             outcome,
             severity: Severity::default(),
             message: message.into(),
             location: Location::default(),
+            role: None,
+            name: None,
             wcag: Vec::new(),
             wcag_level: None,
             tags: Vec::new(),
@@ -169,6 +193,7 @@ impl Finding {
             suggested_code: None,
             snippet: None,
             evidence: Vec::new(),
+            extra: Extra::none(),
         }
     }
 
@@ -195,6 +220,24 @@ impl Finding {
 
     pub fn with_severity(mut self, s: Severity) -> Self {
         self.severity = s;
+        self
+    }
+
+    pub fn with_rule_name(mut self, n: impl Into<String>) -> Self {
+        self.rule_name = Some(n.into());
+        self
+    }
+
+    /// Rolle und Accessible Name des betroffenen Elements.
+    pub fn with_element(mut self, role: Option<String>, name: Option<String>) -> Self {
+        self.role = role;
+        self.name = name;
+        self
+    }
+
+    /// Hängt eine werkzeugspezifische Beigabe an. Siehe [`Extra`].
+    pub fn with_extra<T: std::any::Any + Send + Sync>(mut self, value: T) -> Self {
+        self.extra = Extra::new(value);
         self
     }
 

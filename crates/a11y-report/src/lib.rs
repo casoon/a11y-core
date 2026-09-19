@@ -57,10 +57,12 @@
 
 #![forbid(unsafe_code)]
 
+mod extra;
 mod finding;
 mod outcome;
 mod report;
 
+pub use extra::Extra;
 pub use finding::{Evidence, Finding, Location};
 pub use outcome::{Outcome, Severity, WcagLevel};
 pub use report::{NotRun, Report, RuleRun, Summary};
@@ -196,5 +198,115 @@ mod tests {
         assert_eq!(r.summary.rules_not_run, 2);
         assert!(r.rule_runs[0].did_run());
         assert!(!r.rule_runs[1].did_run());
+    }
+
+    // --- Erweiterungsslot ------------------------------------------------
+
+    #[derive(Debug)]
+    struct Screenshot(Vec<u8>);
+
+    #[test]
+    fn beigabe_kommt_typisiert_zurueck() {
+        let f =
+            Finding::fail("images/alt-missing", "kein alt").with_extra(Screenshot(vec![1, 2, 3]));
+        assert_eq!(f.extra.get::<Screenshot>().map(|s| s.0.len()), Some(3));
+        // Eine andere Sorte liegt nicht darin -- kein falscher Treffer.
+        assert!(f.extra.get::<String>().is_none());
+    }
+
+    #[test]
+    fn beigabe_landet_nicht_im_json() {
+        let f = Finding::fail("a", "x").with_extra(Screenshot(vec![0; 4096]));
+        let j = serde_json::to_string(&f).unwrap();
+        assert!(
+            !j.contains("extra"),
+            "Beigabe darf nicht serialisiert werden: {j}"
+        );
+        // Und sie blaeht den Vertrag nicht auf.
+        assert!(j.len() < 200, "{} Bytes", j.len());
+    }
+
+    #[test]
+    fn beigabe_zaehlt_nicht_zur_identitaet() {
+        // Sonst waeren zwei inhaltlich gleiche Befunde ungleich, nur weil an
+        // einem ein Screenshot haengt.
+        let ohne = Finding::fail("a", "x");
+        let mit = Finding::fail("a", "x").with_extra(Screenshot(vec![9]));
+        assert_eq!(ohne, mit);
+    }
+
+    #[test]
+    fn beigabe_ueberlebt_das_klonen() {
+        let f = Finding::fail("a", "x").with_extra(Screenshot(vec![7, 7]));
+        let k = f.clone();
+        assert_eq!(
+            k.extra.get::<Screenshot>().map(|s| s.0.clone()),
+            Some(vec![7, 7])
+        );
+    }
+
+    // --- Rolle, Name, Regelname ------------------------------------------
+
+    #[test]
+    fn element_und_regelname_gehen_durch_das_json() {
+        let f = Finding::fail("buttons/name-missing", "kein Name")
+            .with_rule_name("Button braucht einen zugänglichen Namen")
+            .with_element(Some("button".into()), None);
+
+        let j: serde_json::Value = serde_json::to_value(&f).unwrap();
+        assert_eq!(j["role"], "button");
+        assert_eq!(j["rule_name"], "Button braucht einen zugänglichen Namen");
+        // Ein fehlender Name ist kein leerer Name -- das Feld faellt weg.
+        assert!(j.get("name").is_none());
+
+        let zurueck: Finding = serde_json::from_value(j).unwrap();
+        assert_eq!(zurueck, f);
+    }
+
+    #[test]
+    fn der_schlanke_fall_bleibt_schlank() {
+        // Die neuen Felder duerfen den Vertrag nicht aufblaehen, wenn sie
+        // ungesetzt sind.
+        let f = Finding::fail("images/alt-missing", "kein alt");
+        let j: serde_json::Value = serde_json::to_value(&f).unwrap();
+        assert_eq!(
+            j.as_object().unwrap().len(),
+            4,
+            "unerwartete Felder: {:?}",
+            j.as_object().unwrap().keys().collect::<Vec<_>>()
+        );
+    }
+
+    // --- Vermerke je Durchgang -------------------------------------------
+
+    #[test]
+    fn derselbe_regelvermerk_kann_je_durchgang_vorkommen() {
+        // Wer dieselbe Seite unter mehreren Bedingungen prueft, fuehrt je
+        // Durchgang einen Vermerk. Der Schluessel ist dann (rule_id, viewport).
+        let mut r = Report::new();
+        r.record(RuleRun::ran("target-size/minimum", 0).in_viewport("desktop"));
+        r.record(RuleRun::ran("target-size/minimum", 3).in_viewport("mobile"));
+        let r = r.finish();
+
+        assert_eq!(r.rule_runs.len(), 2);
+        let mobil = r
+            .rule_runs
+            .iter()
+            .find(|x| x.viewport.as_deref() == Some("mobile"))
+            .unwrap();
+        assert_eq!(mobil.findings, 3);
+    }
+
+    #[test]
+    fn ein_nicht_gelaufener_vermerk_nennt_das_ungeprueffte_kriterium() {
+        let mut r = Report::new();
+        r.record(
+            RuleRun::not_run("contrast/text", NotRun::CapabilityMissing)
+                .with_wcag(["1.4.3"])
+                .with_reason("statische Analyse liefert keine Rendering-Werte"),
+        );
+        let r = r.finish();
+        assert_eq!(r.summary.rules_not_run, 1);
+        assert_eq!(r.rule_runs[0].wcag, vec!["1.4.3"]);
     }
 }

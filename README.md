@@ -1,4 +1,20 @@
-# a11y-core
+# a11y-core — umgezogen nach barrierlab
+
+> **Dieses Repository ist stillgelegt (24.09.2026).** Die vier Crates leben
+> weiter, aber die Quelle ist jetzt das Monorepo
+> **[casoon/barrierlab](https://github.com/casoon/barrierlab)** — dort liegen sie
+> unter `crates/` neben `html-conform`, den Parsern und `a11y-wasm`, mit der
+> vollständigen Historie dieses Repositorys.
+>
+> - **crates.io bleibt unverändert**: `a11y-report`, `a11y-dom`, `accname`,
+>   `a11y-rules`. Versionen bis 0.11.0 stammen von hier, alles danach aus
+>   barrierlab.
+> - **Änderungen, Fehler und Regelfragen** gehören nach barrierlab. Hier wird
+>   nichts mehr gebaut, veröffentlicht oder beantwortet.
+> - Warum: zwei Repositories für denselben Code sind schon einmal auseinander
+>   gelaufen — 0.11.0 entstand hier, während das Monorepo noch auf 0.10.2 stand.
+>
+> Der Text unten beschreibt den Stand bei der Stilllegung.
 
 Gemeinsame Bausteine für Accessibility-Werkzeuge in Rust. Ein Regelbestand
 bedient drei Oberflächen mit identischen Regelkennungen und identischem JSON:

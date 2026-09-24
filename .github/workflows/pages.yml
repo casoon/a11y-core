@@ -1,5 +1,7 @@
 name: Pages
 
+# Das Repository ist stillgelegt; die Projektseite ist nur noch eine
+# Weiterleitung nach barrierlab. Der frühere Build aus site/ ist entfernt.
 on:
   push:
     branches: [main]
@@ -15,53 +17,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      # Die Beispiele in examples/ erzeugt der Generator mit den Crates dieses Repositorys.
-      # Er läuft hier erneut; weicht seine Ausgabe vom eingecheckten Stand ab, bricht der Build ab.
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: examples
-
-      - name: Generate examples
-        run: |
-          cargo run --locked --manifest-path examples/Cargo.toml
-          git diff --exit-code -- examples/
-
-      # Project repos have no package.json at the root, so the pnpm version is set here.
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: site/pnpm-lock.yaml
-
-      - uses: actions/configure-pages@v6
-
-      - name: Build site
-        working-directory: site
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
-
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: site/dist
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: redirect
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4
